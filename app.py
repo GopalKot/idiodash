@@ -19,44 +19,41 @@ st.title("Idiosyncratic Stock Performance (Beta-Hedged vs Index)")
 with st.sidebar:
     st.header("Inputs")
 
-    with st.form("main_form"):
-        ticker = st.text_input("Stock ticker", value="IDIO").strip().upper()
-        lookback = st.selectbox(
-            "Lookback period",
-            ["1mo", "3mo", "6mo", "1y", "2y", "5y", "max"],
-            index=3
+    ticker = st.text_input("Stock ticker", value="APGE").strip().upper()
+    lookback = st.selectbox(
+        "Lookback period",
+        ["1mo", "3mo", "6mo", "1y", "2y", "5y", "max"],
+        index=3
+    )
+
+    # User requested: XBI, SPX, XLV, BBC (BBC likely meant IBB). We'll support both labels.
+    index_label = st.selectbox("Index", ["XBI", "SPX", "XLV", "IBB", "BBC"], index=0)
+
+    # Map friendly labels to Yahoo tickers
+    INDEX_MAP = {
+        "XBI": "XBI",      # SPDR S&P Biotech ETF
+        "SPX": "^GSPC",    # S&P 500 index
+        "XLV": "XLV",      # Health Care Select Sector SPDR
+        "IBB": "IBB",      # iShares Nasdaq Biotechnology ETF
+        "BBC": "IBB",      # treat "BBC" as alias for IBB (common biotech benchmark)
+    }
+    index_ticker = INDEX_MAP[index_label]
+
+    st.divider()
+    st.subheader("Beta Calculation")
+    
+    use_custom_beta_lookback = st.checkbox("Use custom beta lookback", value=False)
+    if use_custom_beta_lookback:
+        beta_lookback_days = st.number_input(
+            "Beta lookback (days)",
+            min_value=30,
+            max_value=1000,
+            value=126,
+            step=1,
+            help="Number of trading days to use for beta estimation"
         )
-
-        # User requested: XBI, SPX, XLV, BBC (BBC likely meant IBB). We'll support both labels.
-        index_label = st.selectbox("Index", ["XBI", "SPX", "XLV", "IBB", "BBC"], index=0)
-
-        # Map friendly labels to Yahoo tickers
-        INDEX_MAP = {
-            "XBI": "XBI",      # SPDR S&P Biotech ETF
-            "SPX": "^GSPC",    # S&P 500 index
-            "XLV": "XLV",      # Health Care Select Sector SPDR
-            "IBB": "IBB",      # iShares Nasdaq Biotechnology ETF
-            "BBC": "IBB",      # treat "BBC" as alias for IBB (common biotech benchmark)
-        }
-        index_ticker = INDEX_MAP[index_label]
-
-        st.divider()
-        st.subheader("Beta Calculation")
-        
-        use_custom_beta_lookback = st.checkbox("Use custom beta lookback", value=False)
-        if use_custom_beta_lookback:
-            beta_lookback_days = st.number_input(
-                "Beta lookback (days)",
-                min_value=30,
-                max_value=1000,
-                value=126,
-                step=1,
-                help="Number of trading days to use for beta estimation"
-            )
-        else:
-            beta_lookback_days = 126  # Default 126 days (~6 months)
-
-        run = st.form_submit_button("Run", type="primary")
+    else:
+        beta_lookback_days = 126  # Default 126 days (~6 months)
 
 # --- Helpers ---
 def fetch_prices(tkr: str, period: str) -> pd.Series:
@@ -110,7 +107,8 @@ def to_cum_perf_from_simple(simple_rets: pd.Series) -> pd.Series:
     return (1 + simple_rets).cumprod() - 1
 
 # --- Main ---
-if run:
+# Auto-run when inputs are provided
+if ticker:
     try:
         with st.spinner("Fetching data..."):
             px_stock = fetch_prices(ticker, lookback)
@@ -157,7 +155,8 @@ if run:
         )
 
         # --- Layout ---
-        c1, c2 = st.columns([2, 1], gap="large")
+        # Fixed width: summary column is 20% (5% narrower than previous 25%)
+        c1, c2 = st.columns([4, 1], gap="large")
 
         with c1:
             st.plotly_chart(fig, use_container_width=True)
@@ -206,6 +205,4 @@ if run:
 
     except Exception as e:
         st.error(str(e))
-else:
-    st.info("Enter a ticker, choose a lookback + index, then click **Run**.")
 
